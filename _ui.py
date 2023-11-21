@@ -70,5 +70,7 @@ class CreateUI:
             message_box.setText(f"Launched with value {self.value} and choice: {self.checkbox_tree_view.choices}")
             message_box.exec()
 
-            human_generator = HumanGenerator()
+            self.task_view.gui3d.app.statusPersist("While the plugin is creating humans it's not possible to use the application")
+            human_generator = HumanGenerator(self.task_view)
             human_generator.create_humans(self.checkbox_tree_view.choices, self.value)
+            self.task_view.gui3d.app.statusPersist("")

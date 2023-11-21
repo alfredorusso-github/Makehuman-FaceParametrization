@@ -2,6 +2,9 @@ import itertools
 import re
 import os
 
+import log
+from core import G
+
 
 class HumanGenerator:
     VERSION = "version v1.2.0"
@@ -21,8 +24,9 @@ class HumanGenerator:
         material HighPolyEyes 2c12f43b-1303-432c-b7ce-d78346baf2e6 eyes/materials/brown.mhmat
         subdivide False"""
 
-    def __init__(self):
+    def __init__(self, task_view):
         self.__create_path()
+        self.task_view = task_view
 
     def __create_path(self):
         # Future version: create a path according to the operating system
@@ -39,9 +43,15 @@ class HumanGenerator:
         values = [[i / 100 for i in range(-100, 101, int(step * 100))] for _ in range(len(choices))]
 
         number = 1
-        for combination in itertools.product(*[value for value in values]):
+        combinations = list(itertools.product(*[value for value in values]))
+        n = len(combinations)
+
+        for combination in combinations:
             self.__write_human(list(zip([choice for choice in choices], combination)), number)
+            G.app.progress(number / n)
             number += 1
+
+        G.app.progress(0)
 
     def __write_human(self, parameters, number):
         file_name = "human_" + str(number) + ".mhm"
