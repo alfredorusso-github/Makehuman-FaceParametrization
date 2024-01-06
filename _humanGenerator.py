@@ -9,13 +9,7 @@ from core import G
 class HumanGenerator:
     VERSION = "version v1.2.0"
     CAMERA = "camera 0.0 0.0 0.0 0.0 0.0 1.225"
-    STANDARD_PARAMETERS = """modifier macrodetails/Gender 1.000000
-        modifier macrodetails/Age 0.500000
-        modifier macrodetails/African 0.000000
-        modifier macrodetails/Asian 0.000000
-        modifier macrodetails/Caucasian 1.000000
-        modifier macrodetails-universal/Muscle 0.500000
-        modifier macrodetails-universal/Weight 0.500000
+    STANDARD_PARAMETERS = """modifier macrodetails-universal/Muscle 0.500000
         modifier macrodetails-height/Height 0.500000
         modifier macrodetails-proportions/BodyProportions 0.500000"""
     SUFFIX = """eyes HighPolyEyes 2c12f43b-1303-432c-b7ce-d78346baf2e6
@@ -24,9 +18,10 @@ class HumanGenerator:
         material HighPolyEyes 2c12f43b-1303-432c-b7ce-d78346baf2e6 eyes/materials/brown.mhmat
         subdivide False"""
 
-    def __init__(self, task_view):
+    def __init__(self, task_view, macrodetails):
         self.__create_path()
         self.task_view = task_view
+        self.macrodetails = macrodetails
 
     def __create_path(self):
         # Future version: create a path according to the operating system
@@ -59,8 +54,8 @@ class HumanGenerator:
         name = "name human_" + str(number)
 
         pattern = r"\n\s+"
-        result = self.VERSION + "\n" + name + "\n" + self.CAMERA + "\n" + re.sub(pattern, "\n",
-                                                                                 self.STANDARD_PARAMETERS) + "\n"
+        result = (self.VERSION + "\n" + name + "\n" + self.CAMERA + "\n" + self.macrodetails + "\n" +
+                  re.sub(pattern, "\n", self.STANDARD_PARAMETERS) + "\n")
 
         for param in parameters:
             result += "modifier " + param[0] + " " + str(param[1]) + "\n"
