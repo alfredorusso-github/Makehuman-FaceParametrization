@@ -1,4 +1,8 @@
+import random
+
 from PyQt5 import QtCore
+
+import log
 from qtgui import TreeItem, TreeView
 
 
@@ -82,6 +86,32 @@ class CheckboxTreeView(TreeView):
         item = CheckboxTreeItem(text, None, isDir)
         self.addTopLevelItem(item)
         return item
+
+    def select_random_children(self, n):
+
+        self.deselect_all_elements()
+
+        for i in range(n):
+            index = random.randint(0, self.invisibleRootItem().childCount() - 1)
+            item = self.topLevelItem(index)
+
+            index = random.randint(0, item.childCount() - 1)
+            item = item.child(index)
+
+            item.setCheckState(0, QtCore.Qt.CheckState.Checked)
+
+    def deselect_all_elements(self):
+        for i in range(self.topLevelItemCount()):
+            top_level_item = self.topLevelItem(i)
+
+            if top_level_item.checkState(0) == QtCore.Qt.CheckState.Checked:
+                top_level_item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
+
+            for j in range(top_level_item.childCount()):
+                child_item = top_level_item.child(j)
+
+                if child_item.checkState(0) == QtCore.Qt.CheckState.Checked:
+                    child_item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
 
     @classmethod
     def add_choice(cls, choice):

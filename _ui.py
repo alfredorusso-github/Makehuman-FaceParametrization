@@ -5,7 +5,7 @@ from numba import cuda
 
 import log
 from core import G
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 from ._checkboxTreeView import CheckboxTreeView
 from ._humanGenerator import HumanGenerator
 
@@ -63,6 +63,9 @@ class CreateUI:
         # create macrodetails area
         self.vertical_layout.addSpacing(20)
         self.__create_macrodetails_area()
+        self.vertical_layout.addSpacing(20)
+
+        self.__create_random_parameters_area()
         self.vertical_layout.addSpacing(20)
 
         # create toggle for gpu usage
@@ -123,6 +126,46 @@ class CreateUI:
         self.__create_weight_layout()
 
         self.__create_macrodetails_buttons()
+
+    def __create_random_parameters_area(self):
+
+        # create label
+        self.parameters_label = QtWidgets.QLabel("Select the number of parameters to choose randomly: 5")
+        font = QtGui.QFont(self.parameters_label.font())
+        font.setPointSize(8)
+        self.parameters_label.setFont(font)
+        self.vertical_layout.addWidget(self.parameters_label)
+
+        # create slider
+        self.parameters_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.parameters_slider.setMinimum(2)
+        self.parameters_slider.setMaximum(7)
+        self.parameters_slider.setValue(5)
+        self.vertical_layout.addWidget(self.parameters_slider)
+
+        self.parameters_slider.valueChanged.connect(self.__paramters_slider_value_changed)
+
+        horizontal_layout = QtWidgets.QHBoxLayout()
+
+        # create buttons
+        self.deselect_all_button = gui.Button("Deselect all parameters")
+        horizontal_layout.addWidget(self.deselect_all_button)
+
+        self.random_parameters_button = gui.Button("Select random parameters")
+        horizontal_layout.addWidget(self.random_parameters_button)
+
+        self.vertical_layout.addLayout(horizontal_layout)
+
+        @self.deselect_all_button.mhEvent
+        def onClicked(event):
+            self.checkbox_tree_view.deselect_all_elements()
+
+        @self.random_parameters_button.mhEvent
+        def onClicked(event):
+            self.checkbox_tree_view.select_random_children(self.parameters_slider.value())
+
+    def __paramters_slider_value_changed(self, value):
+        self.parameters_label.setText(f"Select the number of parameters to choose randomly: {value}")
 
     def __create_ethnicity_layout(self):
         ethnicity_layout = QtWidgets.QHBoxLayout()
