@@ -91,12 +91,19 @@ class CheckboxTreeView(TreeView):
 
         self.deselect_all_elements()
 
-        for i in range(n):
-            index = random.randint(0, self.invisibleRootItem().childCount() - 1)
-            item = self.topLevelItem(index)
+        indexes = []
 
-            index = random.randint(0, item.childCount() - 1)
-            item = item.child(index)
+        for i in range(n):
+            while True:
+                index_top_item = random.randint(0, self.invisibleRootItem().childCount() - 1)
+                item = self.topLevelItem(index_top_item)
+
+                index = random.randint(0, item.childCount() - 1)
+                item = item.child(index)
+
+                if (index_top_item, index) not in indexes:
+                    indexes. append((index_top_item, index))
+                    break
 
             item.setCheckState(0, QtCore.Qt.CheckState.Checked)
 
