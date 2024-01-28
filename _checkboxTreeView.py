@@ -111,7 +111,7 @@ class CheckboxTreeView(TreeView):
         for i in range(self.topLevelItemCount()):
             top_level_item = self.topLevelItem(i)
 
-            if top_level_item.checkState(0) == QtCore.Qt.CheckState.Checked:
+            if top_level_item.checkState(0) == QtCore.Qt.CheckState.Checked or top_level_item.checkState(0) ==  QtCore.Qt.CheckState.PartiallyChecked:
                 top_level_item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
 
             for j in range(top_level_item.childCount()):
