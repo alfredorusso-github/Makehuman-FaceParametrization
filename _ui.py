@@ -13,6 +13,7 @@ from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QThread, pyqtSignal
 from ._checkboxTreeView import CheckboxTreeView
 from ._humanGenerator import HumanGenerator
+from ._imageGenerator import ImageGenerator
 
 
 class CreateUI:
@@ -132,7 +133,17 @@ class CreateUI:
 
         @self.export_button.mhEvent
         def onClicked(event):
-            self.__generate_images()
+
+            # start = time.time()
+            # self.__generate_images()
+            # end = time.time()
+            # log.message(f"Duration of generation with method 1: {end - start}")
+
+            # start = time.time()
+            image_generator = ImageGenerator(self.file_entry.directory)
+            image_generator.generate_images()
+            # end = time.time()
+            # log.message(f"Duration of generation with method 2: {end - start}")
 
     def __generate_images(self):
         tmp_fbx = self.file_entry.directory + "/tmp.fbx"
