@@ -1,16 +1,14 @@
-import os
 import random
-import gui
-import mh
-import bpy
-import wavefront
+from builtins import classmethod
 
+import gui
 import log
+import mh
+
 from core import G
 from numba import cuda
 from getpath import formatPath
 from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtCore import QThread, pyqtSignal
 from ._checkboxTreeView import CheckboxTreeView
 from ._humanGenerator import HumanGenerator
 from ._imageGenerator import ImageGenerator
@@ -23,7 +21,6 @@ class CreateUI:
 
     def __init__(self, task_view):
         self.task_view = task_view
-        self.worker_thread = WorkerThread(self)
         self.value = 0.25
 
         self.__create_treeview()
@@ -55,11 +52,10 @@ class CreateUI:
 
     def __create_left_widgets(self):
         self.__create_generation_box()
-
-        self.__create_export_box()
+        self.__create_image_generation_box()
 
     def __create_generation_box(self):
-        box = self.task_view.addLeftWidget(QtWidgets.QGroupBox("Generation"))
+        box = self.task_view.addLeftWidget(QtWidgets.QGroupBox("Human Generation"))
 
         self.vertical_layout = QtWidgets.QVBoxLayout()
         box.setLayout(self.vertical_layout)
@@ -114,18 +110,30 @@ class CreateUI:
             human_generator.create_humans(self.checkbox_tree_view.choices, self.value)
             self.task_view.gui3d.app.statusPersist("")
 
-    def __create_export_box(self):
+    def __create_image_generation_box(self):
         box = self.task_view.addLeftWidget(gui.GroupBox("Image Generation"))
 
-        self.file_entry = box.addWidget(gui.FileEntryView(label='Select Folder', buttonLabel='Browse', mode='dir'))
+        file_entry_label = QtWidgets.QLabel("Select Folder:")
+        box.addWidget(file_entry_label, 0, 0)
+        self.file_entry = box.addWidget(gui.FileEntryView(buttonLabel='Browse', mode='dir'), 0,  1)
         self.file_entry.filter = 'MakeHuman Models (*.mhm)'
+
+        resolution_label = QtWidgets.QLabel("Resolution")
+        resolution_combobox = QtWidgets.QComboBox()
+        resolution_combobox.addItem("32x32")
+        resolution_combobox.addItem("64x64")
+        resolution_combobox.addItem("128x128")
+        resolution_combobox.addItem("256x256")
+        resolution_combobox.addItem("512x512")
+        resolution_combobox.setCurrentIndex(len(resolution_combobox) - 1)
+
+        box.addWidget(resolution_label, 1, 0)
+        box.addWidget(resolution_combobox, 1, 1)
 
         self.task_view.gui3d.app.addSetting('exportpath', mh.getPath("models"))
         self.file_entry.directory = self.task_view.gui3d.app.getSetting('exportpath')
 
-        self.progress_label = box.addWidget(gui.TextView("Generated -/- images"))
-
-        self.export_button = box.addWidget(gui.Button("Generate Image"))
+        self.export_button = box.addWidget(gui.Button("Generate Image"), columnSpan=2)
 
         @self.file_entry.mhEvent
         def onFileSelected(event):
@@ -133,75 +141,8 @@ class CreateUI:
 
         @self.export_button.mhEvent
         def onClicked(event):
-
-            # start = time.time()
-            # self.__generate_images()
-            # end = time.time()
-            # log.message(f"Duration of generation with method 1: {end - start}")
-
-            # start = time.time()
-            image_generator = ImageGenerator(self.file_entry.directory)
+            image_generator = ImageGenerator(self.file_entry.directory, resolution_combobox.currentText())
             image_generator.generate_images()
-            # end = time.time()
-            # log.message(f"Duration of generation with method 2: {end - start}")
-
-    def __generate_images(self):
-        tmp_fbx = self.file_entry.directory + "/tmp.fbx"
-        # tmp_obj = self.file_entry.directory + "tmp.obj"
-        self.__set_camera_parameters()
-
-        generated_images = 0
-        number_of_files = self.__count_files()
-        self.progress_label.setTextFormat(f"Generated {generated_images}/{number_of_files} images")
-
-        for element in os.listdir(self.file_entry.directory):
-            if element.endswith(".mhm"):
-                self.__export_to_fbx(element, tmp_fbx)
-                self.__generate_image(element, tmp_fbx)
-                generated_images += 1
-                self.progress_label.setTextFormat(f"Generated {generated_images}/{number_of_files} images")
-
-        self.__remove_tmp_object(tmp_fbx)
-        self.progress_label.setTextFormat("Generated -/- images")
-
-    def __count_files(self):
-        counter = 0
-        for element in os.listdir(self.file_entry.directory):
-            if element.endswith(".mhm"):
-                counter += 1
-
-        return counter
-
-    @staticmethod
-    def __set_camera_parameters():
-        camera = bpy.data.objects['Camera']
-        camera.location = (0, -6.5, 13.37)
-        camera.rotation_euler = (1.57079, 0, 0)
-
-        light = bpy.data.objects['Light']
-        light.location = (0, -10, 13.37)
-
-    def __export_to_obj(self, element, tmp_obj):
-        G.app.loadHumanMHM(self.file_entry.directory + "/" + element)
-        wavefront.writeObjFile(tmp_obj, G.app.selectedHuman.mesh)
-
-    def __export_to_fbx(self, element, tmp_fbx):
-        G.app.loadHumanMHM(self.file_entry.directory + "/" + element)
-        G.app.mhapi.exports.exportAsFBX(tmp_fbx, False)
-
-    def __generate_image(self, element, tmp_fbx):
-        # bpy.ops.wm.obj_import(filepath=tmp_obj)
-        bpy.ops.import_scene.fbx(filepath=tmp_fbx)
-        obj = bpy.context.selected_objects[0]
-        bpy.context.scene.render.image_settings.file_format = 'PNG'
-        bpy.context.scene.render.filepath = self.file_entry.directory + "/" + element.split(".")[0] + ".png"
-        bpy.ops.render.render(write_still=True)
-        bpy.data.objects.remove(obj, do_unlink=True)
-
-    @staticmethod
-    def __remove_tmp_object(tmp_fbx):
-        if os.path.exists(tmp_fbx):
-            os.remove(tmp_fbx)
 
     def __get_macrodetails_string(self):
         gender = "modifier macrodetails/Gender " + str(float(self.gender_combobox.currentIndex()))
@@ -364,43 +305,3 @@ class CreateUI:
             self.weight_slider.setValue(random.randint(50, 100))
 
         self.vertical_layout.addLayout(horizontal_layout)
-
-
-class CustomDialog(QtWidgets.QDialog):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-
-    def init_ui(self):
-        self.setWindowTitle('Progress Dialog')
-
-        self.progress_bar = QtWidgets.QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-
-        self.cancel_button = QtWidgets.QPushButton('Cancel', self)
-        self.cancel_button.clicked.connect(self.cancelButtonClicked)
-
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.cancel_button)
-
-        self.setLayout(layout)
-
-    def update(self):
-        self.progress_bar.setValue(self.progress_bar.value() + 1)
-
-    def cancelButtonClicked(self):
-        print('Cancel button clicked')
-        self.close()
-
-
-class WorkerThread(QThread):
-    progress = pyqtSignal(int)
-
-    def __init__(self, create_ui_instance):
-        super().__init__()
-        self.create_ui_instance = create_ui_instance
-
-    def run(self):
-        log.message("Inside Qthread")
-        self.create_ui_instance.generate_images()
