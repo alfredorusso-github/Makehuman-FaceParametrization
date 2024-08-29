@@ -1,9 +1,12 @@
+import json
+import os.path
 import random
 from builtins import classmethod
 
 import gui
 import log
 import mh
+import getpath
 
 from core import G
 from numba import cuda
@@ -17,7 +20,7 @@ from ._imageGenerator import ImageGenerator
 class CreateUI:
     not_needed_params = ["neck", "torso", "hip", "stomach", "buttocks", "pelvis", "armslegs", "breast", "genitals",
                          "macrodetails", "macrodetails-universal", "macrodetails-height", "macrodetails-proportions",
-                         "measure"]
+                         "measure", "bodyshapes"]
 
     def __init__(self, task_view):
         self.task_view = task_view
@@ -76,27 +79,75 @@ class CreateUI:
         self.__create_random_parameters_area()
         self.vertical_layout.addSpacing(20)
 
-        # create toggle for gpu usage
-        self.gpu_toggle = gui.CheckBox("Use gpu")
-        # self.vertical_layout.addWidget(self.gpu_toggle)
+        self.__create_load_choice_from_file_area()
+        self.vertical_layout.addSpacing(20)
+
+        # Random checker
+        toggle_vertical_layout = QtWidgets.QVBoxLayout()
+
+        self.random_toggle = gui.CheckBox('Random Generation')
+        self.is_random_selected = False
+        toggle_vertical_layout.addWidget(self.random_toggle)
+
+        toggle_horizontal_layout = QtWidgets.QHBoxLayout()
+        self.random_label = gui.TextView('Number of files to generate: ')
+        self.random_label.hide()
+        toggle_horizontal_layout.addWidget(self.random_label)
+
+        self.n_files = QtWidgets.QSpinBox()
+        self.n_files.setMaximum(10000000)
+        toggle_horizontal_layout.addWidget(self.n_files)
+        self.n_files.hide()
+        toggle_vertical_layout.addLayout(toggle_horizontal_layout)
+
+        @self.random_toggle.mhEvent
+        def onClicked(event):
+            if self.random_toggle.selected:
+                self.is_random_selected = True
+                self.random_label.show()
+                self.n_files.show()
+            else:
+                self.is_random_selected = False
+                self.random_label.hide()
+                self.n_files.hide()
+
+        self.vertical_layout.addLayout(toggle_vertical_layout)
+
+        # create path chooser for saving files
+        horizontal_layout = QtWidgets.QHBoxLayout()
+        file_entry_label = QtWidgets.QLabel("Select Folder:")
+        horizontal_layout.addWidget(file_entry_label)
+        self.file_entry = gui.FileEntryView(buttonLabel='Browse', mode='dir')
+        horizontal_layout.addWidget(self.file_entry)
+        self.file_entry.filter = 'MakeHuman Models (*.mhm)'
+        self.vertical_layout.addLayout(horizontal_layout)
+
+        self.task_view.gui3d.app.addSetting('human_path', mh.getPath("models"))
+        self.file_entry.directory = self.task_view.gui3d.app.getSetting('human_path')
 
         # create run button
         self.run_button = gui.Button("Run")
         self.vertical_layout.addWidget(self.run_button)
 
-        # self.run_button.clicked.connect(self.on_run_button_clicked)
+        # self.random_button = gui.Button("Print")
+        # self.vertical_layout.addWidget(self.random_button)
+        #
+        # @self.random_button.mhEvent
+        # def onClicked(event):
+        #     human_generator = HumanGenerator(self.task_view, self.__get_macrodetails_string(),
+        #                                      self.file_entry.directory)
+        #     human_generator.random_face_generation()
+
+        @self.file_entry.mhEvent
+        def onFileSelected(event):
+            self.task_view.gui3d.app.setSetting('human_path', formatPath(event.path))
+            self.file_entry.directory = G.app.getSetting('human_path')
 
         @self.run_button.mhEvent
         def onClicked(event):
             message_box = QtWidgets.QMessageBox()
 
-            if self.gpu_toggle.isChecked() and len(cuda.list_devices() == 0):
-                self.gpu_toggle.setChecked(False)
-                message_box.setText("No Nvidia card detected, it's impossible to run the code with GPU.")
-                message_box.exec()
-                return
-
-            if len(self.checkbox_tree_view.choices) == 0:
+            if len(self.checkbox_tree_view.choices) == 0 and not self.random_toggle.selected:
                 message_box.setText("No choice made, choice some parameters")
                 message_box.exec()
                 return
@@ -104,10 +155,9 @@ class CreateUI:
             message_box.setText(f"Launched with value {self.value} and choice: {self.checkbox_tree_view.choices}")
             message_box.exec()
 
-            self.task_view.gui3d.app.statusPersist(
-                "While the plugin is creating humans it's not possible to use the application")
-            human_generator = HumanGenerator(self.task_view, self.__get_macrodetails_string())
-            human_generator.create_humans(self.checkbox_tree_view.choices, self.value)
+            log.message('human_path = ' + G.app.getSetting('human_path') + f'\t {self.file_entry.directory}')
+            human_generator = HumanGenerator(self.task_view, self.__get_macrodetails_string(), self.file_entry.directory)
+            human_generator.create_humans(self.checkbox_tree_view.choices, self.value, self.n_files.value(), self.is_random_selected)
             self.task_view.gui3d.app.statusPersist("")
 
     def __create_image_generation_box(self):
@@ -125,15 +175,20 @@ class CreateUI:
         resolution_combobox.addItem("128x128")
         resolution_combobox.addItem("256x256")
         resolution_combobox.addItem("512x512")
-        resolution_combobox.setCurrentIndex(len(resolution_combobox) - 1)
+        resolution_combobox.setCurrentIndex(2)
 
         box.addWidget(resolution_label, 1, 0)
         box.addWidget(resolution_combobox, 1, 1)
+
+        self.standard_resolution_toggle = gui.CheckBox('Standard resolution')
+        box.addWidget(self.standard_resolution_toggle)
 
         self.task_view.gui3d.app.addSetting('exportpath', mh.getPath("models"))
         self.file_entry.directory = self.task_view.gui3d.app.getSetting('exportpath')
 
         self.export_button = box.addWidget(gui.Button("Generate Image"), columnSpan=2)
+
+        # self.tmp_button = box.addWidget(gui.Button("TMP button"), columnSpan=2)
 
         @self.file_entry.mhEvent
         def onFileSelected(event):
@@ -141,8 +196,13 @@ class CreateUI:
 
         @self.export_button.mhEvent
         def onClicked(event):
-            image_generator = ImageGenerator(self.file_entry.directory, resolution_combobox.currentText())
+            image_generator = ImageGenerator(self.file_entry.directory, resolution_combobox.currentText(), self.standard_resolution_toggle.isChecked())
             image_generator.generate_images()
+
+        # @self.tmp_button.mhEvent
+        # def onClicked(event):
+        #     image_generator = ImageGenerator(self.file_entry.directory, resolution_combobox.currentText(), self.standard_resolution_toggle.isChecked())
+        #     image_generator.generate_images_from_obj()
 
     def __get_macrodetails_string(self):
         gender = "modifier macrodetails/Gender " + str(float(self.gender_combobox.currentIndex()))
@@ -223,6 +283,46 @@ class CreateUI:
         ethnicity_layout.addWidget(self.combobox)
 
         self.vertical_layout.addLayout(ethnicity_layout)
+
+    def __create_load_choice_from_file_area(self):
+        self.vertical_layout.addWidget(gui.TextView("Load choices from json"))
+
+        horizontal_layout = QtWidgets.QHBoxLayout()
+        file_entry_label = QtWidgets.QLabel("Select json file:")
+        horizontal_layout.addWidget(file_entry_label)
+        self.json_entry = gui.FileEntryView(mode='open')
+        horizontal_layout.addWidget(self.json_entry)
+        self.json_entry.filter = 'Json File (*.json)'
+        self.vertical_layout.addLayout(horizontal_layout)
+
+        self.task_view.gui3d.app.addSetting('json_path', os.path.expanduser("~"))
+        self.json_entry.path = self.task_view.gui3d.app.getSetting('json_path')
+
+        @self.json_entry.mhEvent
+        def onFileSelected(event):
+            self.task_view.gui3d.app.setSetting('json_path', formatPath(event.path))
+            self.json_entry.path = G.app.getSetting('json_path')
+            self.__load_choices()
+
+        # print_button = gui.Button("Print")
+        # self.vertical_layout.addWidget(print_button)
+        #
+        # @print_button.mhEvent
+        # def onClicked(event):
+        #     pass
+
+    def __read_choices_from_json(self):
+
+        with open(self.json_entry.path, 'r') as f:
+            data = json.load(f)
+
+        return data
+
+    def __load_choices(self):
+        json_choices = self.__read_choices_from_json()
+        choices = [value for l in json_choices.values() for value in l]
+
+        self.checkbox_tree_view.select_children(choices)
 
     def __create_gender_layout(self):
         gender_layout = QtWidgets.QHBoxLayout()

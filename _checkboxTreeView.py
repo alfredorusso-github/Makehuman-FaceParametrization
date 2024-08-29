@@ -102,16 +102,23 @@ class CheckboxTreeView(TreeView):
                 item = item.child(index)
 
                 if (index_top_item, index) not in indexes:
-                    indexes. append((index_top_item, index))
+                    indexes.append((index_top_item, index))
                     break
 
+            item.setCheckState(0, QtCore.Qt.CheckState.Checked)
+
+    def select_children(self, choices):
+        self.deselect_all_elements()
+
+        for choice in choices:
+            item = self.findItems(choice, QtCore.Qt.MatchRecursive)[0]
             item.setCheckState(0, QtCore.Qt.CheckState.Checked)
 
     def deselect_all_elements(self):
         for i in range(self.topLevelItemCount()):
             top_level_item = self.topLevelItem(i)
 
-            if top_level_item.checkState(0) == QtCore.Qt.CheckState.Checked or top_level_item.checkState(0) ==  QtCore.Qt.CheckState.PartiallyChecked:
+            if top_level_item.checkState(0) == QtCore.Qt.CheckState.Checked or top_level_item.checkState(0) == QtCore.Qt.CheckState.PartiallyChecked:
                 top_level_item.setCheckState(0, QtCore.Qt.CheckState.Unchecked)
 
             for j in range(top_level_item.childCount()):
